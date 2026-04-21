@@ -16,23 +16,10 @@
   SCREEN
 </div>
 
-<!-- SEATS GRID -->
+<!-- GRID -->
 <div id="seats" class="space-y-2"></div>
 
-<!-- LEGEND -->
-<div class="flex gap-4 mt-6 text-sm">
-  <div class="flex items-center gap-2">
-    <div class="w-4 h-4 bg-gray-400"></div> Available
-  </div>
-  <div class="flex items-center gap-2">
-    <div class="w-4 h-4 bg-green-500"></div> Selected
-  </div>
-  <div class="flex items-center gap-2">
-    <div class="w-4 h-4 bg-red-500"></div> Taken
-  </div>
-</div>
-
-<!-- TYPE SELECT -->
+<!-- TYPE -->
 <div class="mt-6">
   <label>Seat Type:</label>
   <select id="seatType" class="text-black p-1 ml-2">
@@ -52,75 +39,48 @@ Confirm Booking
 
 <div id="ticket" class="mt-6"></div>
 
-<script type="module">
+<script>
 
-/* 🔥 FIREBASE SAFE INIT */
-let db = null;
-
-try {
-  const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
-  const { getFirestore, doc, setDoc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-
-  const firebaseConfig = {
-    apiKey: "YOUR_KEY",
-    authDomain: "YOUR_DOMAIN",
-    projectId: "YOUR_ID"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-
-} catch (e) {
-  console.warn("Firebase not connected");
-}
-
-/* 🎟️ CONFIG */
+/* CONFIG */
 const rows = ["A","B","C","D","E"];
 const cols = 10;
 
 let selectedSeats = [];
+let takenSeats = []; // simulación
 
-/* 💰 Price logic */
-function getSeatPrice() {
-  const type = document.getElementById("seatType").value;
-  return type === "child" ? 5 : 10;
+/* PRICE */
+function getPrice() {
+  return document.getElementById("seatType").value === "child" ? 5 : 10;
 }
 
 function updateTotal() {
-  const total = selectedSeats.length * getSeatPrice();
-  document.getElementById("total").innerText = total;
+  document.getElementById("total").innerText =
+    selectedSeats.length * getPrice();
 }
 
-/* 🎨 Render seats */
-async function renderSeats() {
+/* RENDER GRID */
+function renderSeats() {
   const container = document.getElementById("seats");
   container.innerHTML = "";
 
-  for (let row of rows) {
+  rows.forEach(row => {
     const rowDiv = document.createElement("div");
     rowDiv.className = "flex gap-2 justify-center";
 
     for (let i = 1; i <= cols; i++) {
       const seatId = row + i;
-      let taken = false;
-
-      if (db) {
-        try {
-          const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-          const snap = await getDoc(doc(db, "seats", seatId));
-          taken = snap.exists();
-        } catch {}
-      }
 
       const seat = document.createElement("div");
       seat.innerText = i;
       seat.className = "w-8 h-8 flex items-center justify-center text-xs rounded cursor-pointer";
 
-      if (taken) {
-        seat.classList.add("bg-red-500", "cursor-not-allowed");
-      } else if (selectedSeats.includes(seatId)) {
+      if (takenSeats.includes(seatId)) {
+        seat.classList.add("bg-red-500");
+      } 
+      else if (selectedSeats.includes(seatId)) {
         seat.classList.add("bg-green-500");
-      } else {
+      } 
+      else {
         seat.classList.add("bg-gray-400");
 
         seat.onclick = () => {
@@ -138,67 +98,34 @@ async function renderSeats() {
     }
 
     container.appendChild(rowDiv);
-  }
+  });
 }
 
 renderSeats();
 
-/* 💳 Booking */
-window.confirmBooking = async () => {
+/* BOOK */
+function confirmBooking() {
   if (selectedSeats.length === 0) {
-    alert("Select at least one seat");
+    alert("Select seats first");
     return;
   }
 
-  const type = document.getElementById("seatType").value;
-  const price = getSeatPrice();
-
-  if (!db) {
-    alert("Demo mode (no Firebase)");
-    return;
-  }
-
-  try {
-    const { doc, setDoc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-
-    for (let seatId of selectedSeats) {
-      const ref = doc(db, "seats", seatId);
-      const snap = await getDoc(ref);
-
-      if (snap.exists()) {
-        alert("Seat " + seatId + " already taken!");
-        renderSeats();
-        return;
-      }
-
-      await setDoc(ref, {
-        seat: seatId,
-        type: type,
-        price: price,
-        bookedAt: new Date()
-      });
+  selectedSeats.forEach(seat => {
+    if (!takenSeats.includes(seat)) {
+      takenSeats.push(seat);
     }
+  });
 
-    document.getElementById("ticket").innerHTML = `
-      🎟️ <h3 class="text-xl font-bold">Your Seats</h3>
-      Seats: ${selectedSeats.join(", ")} <br>
-      Type: ${type} <br>
-      Total: $${selectedSeats.length * price}
-    `;
+  document.getElementById("ticket").innerHTML = `
+    🎟️ Seats: ${selectedSeats.join(", ")} <br>
+    Total: $${selectedSeats.length * getPrice()}
+  `;
 
-    alert("✅ Booking successful!");
+  selectedSeats = [];
+  updateTotal();
+  renderSeats();
+}
 
-    selectedSeats = [];
-    updateTotal();
-    renderSeats();
-
-  } catch (err) {
-    console.error(err);
-    alert("Error booking");
-  }
-};
-
-/* 🔄 Update total when changing type */
 document.getElementById("seatType").addEventListener("change", updateTotal);
 
 </script>
