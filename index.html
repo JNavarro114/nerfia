@@ -2,21 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Cinema Seat Booking</title>
+<title>Cinema Booking</title>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
 <body class="bg-gray-900 text-white flex flex-col items-center p-6">
 
 <h1 class="text-3xl font-bold mb-2">🎬 Cinema Booking</h1>
-<p class="mb-6 text-gray-400">Select your seats</p>
+<p class="mb-4 text-gray-400">Select your seats</p>
 
 <!-- SCREEN -->
 <div class="w-80 h-6 bg-gray-300 text-black text-center mb-6 rounded">
   SCREEN
 </div>
 
-<!-- SEATS -->
+<!-- SEATS GRID -->
 <div id="seats" class="space-y-2"></div>
 
 <!-- LEGEND -->
@@ -32,9 +32,21 @@
   </div>
 </div>
 
+<!-- TYPE SELECT -->
+<div class="mt-6">
+  <label>Seat Type:</label>
+  <select id="seatType" class="text-black p-1 ml-2">
+    <option value="adult">Adult ($10)</option>
+    <option value="child">Child ($5)</option>
+  </select>
+</div>
+
+<!-- TOTAL -->
+<p class="mt-4 text-lg">Total: $<span id="total">0</span></p>
+
 <!-- BUTTON -->
 <button onclick="confirmBooking()" 
-class="mt-6 bg-purple-600 px-6 py-2 rounded">
+class="mt-4 bg-purple-600 px-6 py-2 rounded">
 Confirm Booking
 </button>
 
@@ -42,7 +54,7 @@ Confirm Booking
 
 <script type="module">
 
-/* 🔥 OPTIONAL FIREBASE */
+/* 🔥 FIREBASE SAFE INIT */
 let db = null;
 
 try {
@@ -58,8 +70,8 @@ try {
   const app = initializeApp(firebaseConfig);
   db = getFirestore(app);
 
-} catch (err) {
-  console.warn("⚠️ Firebase not connected → running offline mode");
+} catch (e) {
+  console.warn("Firebase not connected");
 }
 
 /* 🎟️ CONFIG */
@@ -68,7 +80,18 @@ const cols = 10;
 
 let selectedSeats = [];
 
-/* 🎨 Render Seats */
+/* 💰 Price logic */
+function getSeatPrice() {
+  const type = document.getElementById("seatType").value;
+  return type === "child" ? 5 : 10;
+}
+
+function updateTotal() {
+  const total = selectedSeats.length * getSeatPrice();
+  document.getElementById("total").innerText = total;
+}
+
+/* 🎨 Render seats */
 async function renderSeats() {
   const container = document.getElementById("seats");
   container.innerHTML = "";
@@ -79,7 +102,6 @@ async function renderSeats() {
 
     for (let i = 1; i <= cols; i++) {
       const seatId = row + i;
-
       let taken = false;
 
       if (db) {
@@ -87,9 +109,7 @@ async function renderSeats() {
           const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
           const snap = await getDoc(doc(db, "seats", seatId));
           taken = snap.exists();
-        } catch (e) {
-          console.log("Firestore error", e);
-        }
+        } catch {}
       }
 
       const seat = document.createElement("div");
@@ -109,6 +129,7 @@ async function renderSeats() {
           } else {
             selectedSeats.push(seatId);
           }
+          updateTotal();
           renderSeats();
         };
       }
@@ -129,8 +150,11 @@ window.confirmBooking = async () => {
     return;
   }
 
+  const type = document.getElementById("seatType").value;
+  const price = getSeatPrice();
+
   if (!db) {
-    alert("⚠️ Firebase not connected (demo mode)");
+    alert("Demo mode (no Firebase)");
     return;
   }
 
@@ -149,25 +173,33 @@ window.confirmBooking = async () => {
 
       await setDoc(ref, {
         seat: seatId,
+        type: type,
+        price: price,
         bookedAt: new Date()
       });
     }
 
     document.getElementById("ticket").innerHTML = `
       🎟️ <h3 class="text-xl font-bold">Your Seats</h3>
-      ${selectedSeats.join(", ")}
+      Seats: ${selectedSeats.join(", ")} <br>
+      Type: ${type} <br>
+      Total: $${selectedSeats.length * price}
     `;
 
     alert("✅ Booking successful!");
 
     selectedSeats = [];
+    updateTotal();
     renderSeats();
 
   } catch (err) {
     console.error(err);
-    alert("Error booking seats");
+    alert("Error booking");
   }
 };
+
+/* 🔄 Update total when changing type */
+document.getElementById("seatType").addEventListener("change", updateTotal);
 
 </script>
 
